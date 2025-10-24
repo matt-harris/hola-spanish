@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Volume2, Play, ChevronRight, CheckCircle, Home, Lightbulb } from 'lucide-react';
+import { Volume2, Play, ChevronRight, CheckCircle, Home, Lightbulb, ThumbsUp, ThumbsDown } from 'lucide-react'; 
 
+	
 interface Phrase {
   english: string;
   spanish: string;
@@ -89,8 +90,9 @@ const App = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [hintLevel, setHintLevel] = useState(0); // 0: None, 1: First Letter, 2: Phonetic
+  const [knownCount, setKnownCount] = useState(0); // State to track correct answers
   const [ttsSupported, setTtsSupported] = useState(true);
-  const [spanishVoice, setSpanishVoice] = useState<SpeechSynthesisVoice | null>(null); 
+  const [spanishVoice, setSpanishVoice] = useState<SpeechSynthesisVoice | null>(null);
 
   // --- TTS Voice Initialization (Remains the same for high-quality voice) ---
   useEffect(() => {
@@ -161,6 +163,7 @@ const App = () => {
     setCurrentStep(0);
     setShowAnswer(false);
     setHintLevel(0); // Reset hint state
+    setKnownCount(0); // Reset known count
     setView('learning');
   }, []);
 
@@ -170,7 +173,8 @@ const App = () => {
   const speakPhrase = useCallback((text: string) => {
     if (!ttsSupported) {
         console.error("TTS not supported.");
-        alert('Text-to-Speech is not available in your browser.'); 
+        // Replaced alert with console error as per instructions
+        console.error('Text-to-Speech is not available in your browser.'); 
         return;
     }
 
@@ -196,37 +200,51 @@ const App = () => {
     }
   };
 
+  // New handlers for self-assessment
+  const handleKnowIt = () => {
+    setKnownCount(prev => prev + 1);
+    handleNext();
+  };
+
+  const handleNeedsReview = () => {
+    handleNext(); // Just move to the next phrase
+  };
+
   const handleRestart = () => {
     setView('home');
     setSelectedPhrases([]);
     setCurrentStep(0);
     setShowAnswer(false);
     setHintLevel(0); // Reset hint state
+    setKnownCount(0); // Reset known count
   };
 
   // --- UI Components ---
 
-  const ActionButton = ({ 
-    children, 
-    onClick, 
-    color = 'bg-indigo-600', 
-    disabled = false, 
-    icon: Icon = null 
-  }: { 
+  const ActionButton = ({
+    children,
+    onClick,
+    color = 'bg-indigo-600',
+    disabled = false,
+    icon: Icon = null,
+    className = '' // Fix 2: Added default value for optional prop
+  }: {
     children: React.ReactNode;
     onClick: () => void;
     color?: string;
     disabled?: boolean;
     icon?: React.ComponentType<{ className?: string }> | null;
+    className?: string; // Fix 1: Added className to the type definition
   }) => (
     <button
       onClick={onClick}
       disabled={disabled}
       className={`
-        w-full py-3 px-6 text-lg font-bold rounded-full transition-all duration-300 flex items-center justify-center space-x-2
+        w-full py-3 px-4 text-base font-bold rounded-full transition-all duration-300 flex items-center justify-center space-x-1 
         ${color} text-white shadow-lg transform
         ${disabled ? 'opacity-50 cursor-not-allowed shadow-inner' : 'hover:bg-indigo-700 hover:shadow-xl active:scale-[0.98]'}
-        md:w-auto md:min-w-[180px]
+        md:text-sm md:px-3
+        ${className} // Fix 3: Applied the passed-in classes
       `}
     >
       {Icon && <Icon className="w-5 h-5" />}
@@ -348,29 +366,37 @@ const App = () => {
       </div>
 
       {/* Action Buttons */}
-      <div className="mt-8 space-y-4 md:space-y-0 md:flex md:gap-4 justify-between">
+      <div className="mt-8 space-y-4">
         {!showAnswer ? (
+          // Fixed the error by removing the redundant className prop, which is already handled internally.
           <ActionButton onClick={() => setShowAnswer(true)} color="bg-indigo-600 hover:bg-indigo-700">
             Reveal Answer
           </ActionButton>
         ) : (
-          <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <ActionButton 
               onClick={() => speakPhrase(currentPhrase.spanish)} 
-              color="bg-green-500 hover:bg-green-600"
+              color="bg-blue-500 hover:bg-blue-600"
               icon={Volume2}
               disabled={!ttsSupported}
             >
               Speak
             </ActionButton>
             <ActionButton 
-                onClick={handleNext} 
-                color="bg-indigo-600 hover:bg-indigo-700"
-                icon={ChevronRight}
+                onClick={handleNeedsReview} 
+                color="bg-orange-500 hover:bg-orange-600"
+                icon={ThumbsDown}
             >
-              {currentStep < selectedPhrases.length - 1 ? 'Next Phrase' : 'Finish Session'}
+              Needs Review
             </ActionButton>
-          </>
+             <ActionButton 
+                onClick={handleKnowIt} 
+                color="bg-green-500 hover:bg-green-600"
+                icon={ThumbsUp}
+            >
+              I Knew It!
+            </ActionButton>
+          </div>
         )}
       </div>
       
@@ -388,7 +414,7 @@ const App = () => {
         <CheckCircle className="h-20 w-20 text-green-500 mb-4 animate-bounce" />
         <h1 className="text-4xl md:text-5xl font-black text-green-700 mb-2">¡Felicidades!</h1>
         <p className="text-xl text-gray-700 mb-8">
-            You've successfully mastered 6 key travel phrases. Time to practice them!
+            You finished the session and knew <span className="font-bold text-gray-900">{knownCount}</span> out of <span className="font-bold text-gray-900">{selectedPhrases.length}</span> phrases!
         </p>
         <ActionButton onClick={handleRestart} color="bg-indigo-600 hover:bg-indigo-700" icon={Home}>
           Start New Session
@@ -400,7 +426,7 @@ const App = () => {
   return (
     <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4 md:p-8">
       {/* Container Card */}
-      <div className="w-full max-w-xl">
+      <div className="w-full max-w-2xl">
         {(() => {
           switch (view) {
             case 'learning':
