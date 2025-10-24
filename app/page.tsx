@@ -2,6 +2,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Volume2, Play, ChevronRight, CheckCircle, Home, Lightbulb } from 'lucide-react';
 
+interface Phrase {
+  english: string;
+  spanish: string;
+  phonetic: string;
+  category: string;
+}
+
 // --- PHRASE DATA (Structured from the provided text) ---
 const PHRASE_DATA = [
   // 1. Greetings & Essential Politeness
@@ -78,12 +85,12 @@ const PHRASE_DATA = [
 
 const App = () => {
   const [view, setView] = useState('home'); // 'home' | 'learning' | 'finished'
-  const [selectedPhrases, setSelectedPhrases] = useState([]);
+  const [selectedPhrases, setSelectedPhrases] = useState<Phrase[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [hintLevel, setHintLevel] = useState(0); // 0: None, 1: First Letter, 2: Phonetic
   const [ttsSupported, setTtsSupported] = useState(true);
-  const [spanishVoice, setSpanishVoice] = useState(null); 
+  const [spanishVoice, setSpanishVoice] = useState<SpeechSynthesisVoice | null>(null); 
 
   // --- TTS Voice Initialization (Remains the same for high-quality voice) ---
   useEffect(() => {
@@ -160,7 +167,7 @@ const App = () => {
   const currentPhrase = selectedPhrases[currentStep];
 
   // Text-to-Speech Function (Remains the same)
-  const speakPhrase = useCallback((text) => {
+  const speakPhrase = useCallback((text: string) => {
     if (!ttsSupported) {
         console.error("TTS not supported.");
         alert('Text-to-Speech is not available in your browser.'); 
@@ -199,7 +206,19 @@ const App = () => {
 
   // --- UI Components ---
 
-  const ActionButton = ({ children, onClick, color = 'bg-indigo-600', disabled = false, icon: Icon = null }) => (
+  const ActionButton = ({ 
+    children, 
+    onClick, 
+    color = 'bg-indigo-600', 
+    disabled = false, 
+    icon: Icon = null 
+  }: { 
+    children: React.ReactNode;
+    onClick: () => void;
+    color?: string;
+    disabled?: boolean;
+    icon?: React.ComponentType<{ className?: string }> | null;
+  }) => (
     <button
       onClick={onClick}
       disabled={disabled}
