@@ -10,7 +10,6 @@ interface Phrase {
   category: string;
 }
 
-// --- PHRASE DATA (Structured from the provided text) ---
 const PHRASE_DATA = [
   // 1. Greetings & Essential Politeness
   { english: "Hello", spanish: "Hola", phonetic: "OH-lah", category: "Greetings & Politeness" },
@@ -44,10 +43,9 @@ const PHRASE_DATA = [
   { english: "I am from...", spanish: "Soy de...", phonetic: "soy day...", category: "Conversation & Introductions" },
 
   // 3. At the Restaurant & Bar
-  { english: "A table for two, please", spanish: "Una mesa para dos, por favor", phonetic: "OO-nah MAY-sa PA-ra dohs, por fa-VOR", category: "Restaurant & Bar" },
+  { english: "A table for four, please", spanish: "Una mesa para cuatro, por favor", phonetic: "OO-nah MAY-sa PA-ra KWA-tro, por fa-VOR", category: "Restaurant & Bar" },
   { english: "The menu, please", spanish: "La carta, por favor", phonetic: "la CAR-ta, por fa-VOR", category: "Restaurant & Bar" },
   { english: "The menu of the day (set lunch menu)", spanish: "El menú del día", phonetic: "el may-NOO del DEE-ah", category: "Restaurant & Bar" },
-  { english: "What do you recommend?", spanish: "¿Qué me recomienda?", phonetic: "kay may reh-ko-mee-EN-da", category: "Restaurant & Bar" },
   { english: "I would like... (polite)", spanish: "Quisiera...", phonetic: "kee-see-EH-ra...", category: "Restaurant & Bar" },
   { english: "I want... (more direct)", spanish: "Quiero...", phonetic: "kee-EH-ro...", category: "Restaurant & Bar" },
   { english: "To drink...", spanish: "Para beber...", phonetic: "PA-ra bay-BER...", category: "Restaurant & Bar" },
@@ -57,9 +55,7 @@ const PHRASE_DATA = [
   { english: "Water (sparkling / still)", spanish: "Agua (con gas / sin gas)", phonetic: "AH-gwa (kon gas / seen gas)", category: "Restaurant & Bar" },
   { english: "A coffee with milk", spanish: "Un café con leche", phonetic: "oon ka-FAY kon LEH-chay", category: "Restaurant & Bar" },
   { english: "Cheers!", spanish: "¡Salud!", phonetic: "sa-LOOD", category: "Restaurant & Bar" },
-  { english: "Enjoy your meal!", spanish: "¡Buen provecho!", phonetic: "bwen pro-VAY-cho", category: "Restaurant & Bar" },
   { english: "It was delicious", spanish: "Estaba delicioso", phonetic: "es-TA-ba day-lee-thee-OH-so", category: "Restaurant & Bar" },
-  { english: "I am a vegetarian", spanish: "Soy vegetariano(a)", phonetic: "soy vay-hay-ta-ree-AH-no/a", category: "Restaurant & Bar" },
   { english: "I have an allergy to...", spanish: "Tengo alergia a...", phonetic: "TEN-go ah-LER-hee-ah ah...", category: "Restaurant & Bar" },
   { english: "The bill, please", spanish: "La cuenta, por favor", phonetic: "la KWEN-ta, por fa-VOR", category: "Restaurant & Bar" },
   { english: "Can I pay by card?", spanish: "¿Puedo pagar con tarjeta?", phonetic: "PWAY-doh pa-GAR kon tar-HAY-ta", category: "Restaurant & Bar" },
