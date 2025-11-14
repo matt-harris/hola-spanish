@@ -1,16 +1,11 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Volume2, Play, ChevronRight, CheckCircle, Home, Lightbulb, ThumbsUp, ThumbsDown } from 'lucide-react'; 
+import { 
+    Volume2, Play, CheckCircle, Home, Lightbulb, ThumbsUp, ThumbsDown, Repeat2
+} from 'lucide-react'; 
 
-	
-interface Phrase {
-  english: string;
-  spanish: string;
-  phonetic: string;
-  category: string;
-}
-
-const PHRASE_DATA = [
+// --- INITIAL IN-MEMORY DATA (87 Phrases across 6 Categories) ---
+const INITIAL_PHRASES = [
   // 1. Greetings & Essential Politeness
   { english: "Hello", spanish: "Hola", phonetic: "OH-lah", category: "Greetings & Politeness" },
   { english: "Good morning", spanish: "Buenos días", phonetic: "BWAY-nohs DEE-ahs", category: "Greetings & Politeness" },
@@ -78,7 +73,44 @@ const PHRASE_DATA = [
   { english: "Friday", spanish: "Viernes", phonetic: "vee-EHR-nes", category: "Numbers, Days, & Time" },
   { english: "Saturday", spanish: "Sábado", phonetic: "SA-ba-doh", category: "Numbers, Days, & Time" },
   { english: "Sunday", spanish: "Domingo", phonetic: "doh-MEEN-go", category: "Numbers, Days, & Time" },
+
+  // 5. Months and Seasons
+  { english: "January", spanish: "Enero", phonetic: "eh-NEH-roh", category: "Months and Seasons" },
+  { english: "February", spanish: "Febrero", phonetic: "feh-BREH-roh", category: "Months and Seasons" },
+  { english: "March", spanish: "Marzo", phonetic: "MAHR-soh", category: "Months and Seasons" },
+  { english: "April", spanish: "Abril", phonetic: "ah-BREEL", category: "Months and Seasons" },
+  { english: "May", spanish: "Mayo", phonetic: "MAH-yoh", category: "Months and Seasons" },
+  { english: "June", spanish: "Junio", phonetic: "HOO-nee-oh", category: "Months and Seasons" },
+  { english: "July", spanish: "Julio", phonetic: "HOO-lee-oh", category: "Months and Seasons" },
+  { english: "August", spanish: "Agosto", phonetic: "ah-GOHS-toh", category: "Months and Seasons" },
+  { english: "September", spanish: "Septiembre", phonetic: "sep-tee-EHM-breh", category: "Months and Seasons" },
+  { english: "October", spanish: "Octubre", phonetic: "ok-TOO-breh", category: "Months and Seasons" },
+  { english: "November", spanish: "Noviembre", phonetic: "noh-vee-EHM-breh", category: "Months and Seasons" },
+  { english: "December", spanish: "Diciembre", phonetic: "dee-thee-EHM-breh", category: "Months and Seasons" },
+  { english: "Spring", spanish: "Primavera", phonetic: "pree-mah-VEH-rah", category: "Months and Seasons" },
+  { english: "Summer", spanish: "Verano", phonetic: "veh-RAH-noh", category: "Months and Seasons" },
+  { english: "Autumn / Fall", spanish: "Otoño", phonetic: "oh-TOH-nyoh", category: "Months and Seasons" },
+  { english: "Winter", spanish: "Invierno", phonetic: "een-vee-EHR-noh", category: "Months and Seasons" },
+  
+  // 6. Colours (New Category)
+  { english: "Red", spanish: "Rojo", phonetic: "ROH-hoh", category: "Colours" },
+  { english: "Blue", spanish: "Azul", phonetic: "ah-SOOL", category: "Colours" },
+  { english: "Green", spanish: "Verde", phonetic: "VAYR-deh", category: "Colours" },
+  { english: "Yellow", spanish: "Amarillo", phonetic: "ah-mah-REE-yoh", category: "Colours" },
+  { english: "Black", spanish: "Negro", phonetic: "NEH-groh", category: "Colours" },
+  { english: "White", spanish: "Blanco", phonetic: "BLAHN-koh", category: "Colours" },
+  { english: "Purple", spanish: "Morado", phonetic: "moh-RAH-doh", category: "Colours" },
+  { english: "Orange", spanish: "Naranja", phonetic: "nah-RAHN-hah", category: "Colours" },
+  { english: "Pink", spanish: "Rosado", phonetic: "roh-SAH-doh", category: "Colours" },
+  { english: "Grey", spanish: "Gris", phonetic: "grees", category: "Colours" }, // Updated from Gray to Grey
 ];
+
+interface Phrase {
+  english: string;
+  spanish: string;
+  phonetic: string;
+  category: string;
+}
 
 const App = () => {
   const [view, setView] = useState('home'); // 'home' | 'learning' | 'finished'
@@ -88,122 +120,182 @@ const App = () => {
   const [hintLevel, setHintLevel] = useState(0); // 0: None, 1: First Letter, 2: Phonetic
   const [knownCount, setKnownCount] = useState(0); // State to track correct answers
   const [ttsSupported, setTtsSupported] = useState(true);
-  const [spanishVoice, setSpanishVoice] = useState<SpeechSynthesisVoice | null>(null);
+  
+  // NEW STATE: Tracks phrases the user flagged for review
+  const [reviewList, setReviewList] = useState<Phrase[]>([]);
+  
+  // New state to hold the specific Google voice object
+  const [googleSpanishVoice, setGoogleSpanishVoice] = useState<SpeechSynthesisVoice | null>(null);
 
-  // --- TTS Voice Initialization (Remains the same for high-quality voice) ---
+  // --- Local Data States ---
+  const [allPhrases] = useState<Phrase[]>(INITIAL_PHRASES); 
+
+  // --- Category Management ---
+  const ALL_CATEGORIES = useMemo(() => {
+      // Extract unique categories from the local phrase data
+      return Array.from(new Set(allPhrases.map(p => p.category))).sort();
+  }, [allPhrases]);
+
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  
+  useEffect(() => {
+      // Auto-select all categories initially
+      if (ALL_CATEGORIES.length > 0 && selectedCategories.length === 0) {
+          setSelectedCategories(ALL_CATEGORIES);
+      }
+  }, [ALL_CATEGORIES, selectedCategories.length]);
+
+
+  const toggleCategory = (category: string) => {
+      setSelectedCategories(prev => {
+          if (prev.includes(category)) {
+              // Prevent deselecting the last category
+              if (prev.length === 1) return prev; 
+              return prev.filter(c => c !== category);
+          } else {
+              return [...prev, category];
+          }
+      });
+  };
+  // --- End Category Management ---
+
+  // --- Dynamic Phrase Calculation (for Home and Finished Views) ---
+  const { phrasesInSelection, phrasesToStart } = useMemo(() => {
+    // Only count phrases from selected categories
+    const filteredPhrases = allPhrases.filter(p => selectedCategories.includes(p.category));
+    const countInSelection = filteredPhrases.length;
+    // Session size limit is 10
+    const countToStart = Math.min(10, countInSelection);
+    return { phrasesInSelection: countInSelection, phrasesToStart: countToStart };
+  }, [allPhrases, selectedCategories]);
+
+  // --- TTS Voice Initialization (Updated to find Google Spanish voice) ---
   useEffect(() => {
     if (!('speechSynthesis' in window)) {
-      console.warn("Text-to-Speech is not supported in this browser.");
+      console.warn("TTS INIT: Text-to-Speech is NOT supported in this browser.");
       setTtsSupported(false);
       return;
     }
     
-    const findAndSetVoice = () => {
+    const findAndLogVoice = () => {
       const voices = window.speechSynthesis.getVoices();
       
-      let selectedVoice = voices.find(voice => 
-        voice.lang.startsWith('es-') && 
-        (voice.name.includes('Google') || voice.name.includes('Microsoft'))
+      // Look for a high-quality Google voice, prioritizing one with 'es-' lang code
+      const targetVoice = voices.find(voice => 
+          voice.name.includes('Google') && 
+          (voice.lang.startsWith('es-') || voice.name.includes('Spanish') || voice.name.includes('español'))
       );
 
-      if (!selectedVoice) {
-          selectedVoice = voices.find(voice => voice.lang.startsWith('es-'));
-      }
-
-      if (selectedVoice) {
-          setSpanishVoice(selectedVoice);
+      if (targetVoice) {
+          console.log(`TTS INIT: Found preferred Google Spanish voice: ${targetVoice.name} (${targetVoice.lang}).`);
+          setGoogleSpanishVoice(targetVoice);
+      } else {
+          // Fallback to any generic Spanish voice for logging purposes
+          const fallbackVoice = voices.find(voice => voice.lang.startsWith('es-'));
+          if (fallbackVoice) {
+               console.warn(`TTS INIT: Could not find specific Google Spanish voice. Falling back to browser default Spanish voice: ${fallbackVoice.name} (${fallbackVoice.lang}).`);
+          } else {
+               console.warn("TTS INIT: Could not find any Spanish voice. Using 'es-ES' language code fallback.");
+          }
+          setGoogleSpanishVoice(null); // Set null if the specific Google voice isn't found
       }
     };
 
-    findAndSetVoice();
-    window.speechSynthesis.onvoiceschanged = findAndSetVoice;
+    // Check immediately and then on voiceschanged event
+    findAndLogVoice();
+    window.speechSynthesis.onvoiceschanged = findAndLogVoice;
     
     return () => {
         window.speechSynthesis.onvoiceschanged = null;
     };
   }, []); 
 
-  // Function to get 6 random, unique phrases with different categories (Remains the same)
   const selectRandomPhrases = useCallback(() => {
-    const categories = Array.from(new Set(PHRASE_DATA.map(p => p.category)));
-    let uniquePhrases = [];
-    let usedIndices = new Set();
-    
-    categories.forEach(category => {
-      const categoryPhrases = PHRASE_DATA.filter(p => p.category === category);
-      if (categoryPhrases.length > 0) {
-        const randomIndex = Math.floor(Math.random() * categoryPhrases.length);
-        const phrase = categoryPhrases[randomIndex];
-        
-        const originalIndex = PHRASE_DATA.findIndex(p => p === phrase);
-        
-        if (!usedIndices.has(originalIndex)) {
-            uniquePhrases.push(phrase);
-            usedIndices.add(originalIndex);
-        }
-      }
-    });
+    const filteredPhrases = allPhrases.filter(p => selectedCategories.includes(p.category));
 
-    while (uniquePhrases.length < 6) {
-      const randomIndex = Math.floor(Math.random() * PHRASE_DATA.length);
-      
-      if (!usedIndices.has(randomIndex)) {
-        uniquePhrases.push(PHRASE_DATA[randomIndex]);
-        usedIndices.add(randomIndex);
-      }
+    if (filteredPhrases.length === 0) {
+        console.error("Cannot start session: No phrases available based on selected categories.");
+        return; 
     }
-    
-    uniquePhrases.sort(() => Math.random() - 0.5);
 
+    // Use the updated session limit of 10
+    const countToSelect = Math.min(10, filteredPhrases.length);
+    
+    // Simple shuffle for randomization
+    const shuffledPhrases = filteredPhrases.sort(() => Math.random() - 0.5);
+    const uniquePhrases = shuffledPhrases.slice(0, countToSelect);
+    
     setSelectedPhrases(uniquePhrases);
     setCurrentStep(0);
     setShowAnswer(false);
-    setHintLevel(0); // Reset hint state
-    setKnownCount(0); // Reset known count
+    setHintLevel(0);
+    setKnownCount(0);
+    // Clear review list when starting a fresh session from Home
+    setReviewList([]); 
     setView('learning');
-  }, []);
+  }, [allPhrases, selectedCategories]);
+
+  // NEW FUNCTION: Starts a session using only the missed phrases
+  const startReviewSession = useCallback(() => {
+    setSelectedPhrases(reviewList);
+    setCurrentStep(0);
+    setShowAnswer(false);
+    setHintLevel(0);
+    setKnownCount(0);
+    // Clear the review list so subsequent sessions start fresh
+    setReviewList([]); 
+    setView('learning');
+  }, [reviewList]);
+
 
   const currentPhrase = selectedPhrases[currentStep];
 
-  // Text-to-Speech Function (Remains the same)
   const speakPhrase = useCallback((text: string) => {
     if (!ttsSupported) {
-        console.error("TTS not supported.");
-        // Replaced alert with console error as per instructions
-        console.error('Text-to-Speech is not available in your browser.'); 
+        console.error('TTS Speak: Text-to-Speech is not available in your browser.'); 
         return;
     }
 
+    // Stop any current speaking before starting a new one
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+    }
+    
     const utterance = new SpeechSynthesisUtterance(text);
     
-    if (spanishVoice) {
-      utterance.voice = spanishVoice;
+    // 1. Try to use the specifically identified Google Spanish Voice
+    if (googleSpanishVoice) {
+        utterance.voice = googleSpanishVoice;
+        utterance.lang = googleSpanishVoice.lang; // Use the specific lang code of the chosen voice
     } else {
-      utterance.lang = 'es-ES'; 
+        // 2. Fallback to generic es-ES language code
+        utterance.lang = 'es-ES'; 
     }
 
     window.speechSynthesis.speak(utterance);
-  }, [ttsSupported, spanishVoice]);
+  }, [ttsSupported, googleSpanishVoice]); 
 
-  // Navigation functions
   const handleNext = () => {
     if (currentStep < selectedPhrases.length - 1) {
       setCurrentStep(prev => prev + 1);
       setShowAnswer(false);
-      setHintLevel(0); // Reset hint state
+      setHintLevel(0);
     } else {
       setView('finished'); 
     }
   };
 
-  // New handlers for self-assessment
   const handleKnowIt = () => {
     setKnownCount(prev => prev + 1);
     handleNext();
   };
 
   const handleNeedsReview = () => {
-    handleNext(); // Just move to the next phrase
+    // ADD THE CURRENT PHRASE TO THE REVIEW LIST
+    if (currentPhrase) {
+        setReviewList(prev => [...prev, currentPhrase]);
+    }
+    handleNext();
   };
 
   const handleRestart = () => {
@@ -211,10 +303,12 @@ const App = () => {
     setSelectedPhrases([]);
     setCurrentStep(0);
     setShowAnswer(false);
-    setHintLevel(0); // Reset hint state
-    setKnownCount(0); // Reset known count
+    setHintLevel(0);
+    setKnownCount(0);
+    setReviewList([]); // Clear review list when going back to home
+    setSelectedCategories(ALL_CATEGORIES); 
   };
-
+  
   // --- UI Components ---
 
   const ActionButton = ({
@@ -223,14 +317,14 @@ const App = () => {
     color = 'bg-indigo-600',
     disabled = false,
     icon: Icon = null,
-    className = '' // Fix 2: Added default value for optional prop
+    className = ''
   }: {
     children: React.ReactNode;
     onClick: () => void;
     color?: string;
     disabled?: boolean;
     icon?: React.ComponentType<{ className?: string }> | null;
-    className?: string; // Fix 1: Added className to the type definition
+    className?: string; 
   }) => (
     <button
       onClick={onClick}
@@ -240,7 +334,7 @@ const App = () => {
         ${color} text-white shadow-lg transform
         ${disabled ? 'opacity-50 cursor-not-allowed shadow-inner' : 'hover:bg-indigo-700 hover:shadow-xl active:scale-[0.98]'}
         md:text-sm md:px-3
-        ${className} // Fix 3: Applied the passed-in classes
+        ${className}
       `}
     >
       {Icon && <Icon className="w-5 h-5" />}
@@ -248,7 +342,6 @@ const App = () => {
     </button>
   );
   
-  // Updated Hint Button component with two tiers
   const HintButton = () => {
     let buttonText;
     if (hintLevel === 0) {
@@ -256,7 +349,6 @@ const App = () => {
     } else if (hintLevel === 1) {
       buttonText = 'Hint (Phonetic)';
     } else {
-      // Should be disabled when hintLevel >= 2
       buttonText = 'Max Hint Reached'; 
     }
 
@@ -276,20 +368,91 @@ const App = () => {
       </button>
     );
   };
+  
 
-  const HomeView = () => (
-    <div className="flex flex-col items-center justify-center p-8 bg-white rounded-3xl shadow-2xl border-t-8 border-indigo-500 w-full">
-      <h1 className="text-5xl md:text-7xl font-black text-indigo-700 mb-2 tracking-tight">
-        Hola Spanish!
-      </h1>
-      <p className="text-xl md:text-2xl font-light text-gray-500 mb-10 text-center">
-        Your essential Spanish phrasebook.
-      </p>
-      <ActionButton onClick={selectRandomPhrases} icon={Play} color="bg-green-500 hover:bg-green-600">
-        Start 6 Phrases
-      </ActionButton>
-    </div>
-  );
+  const HomeView = () => {
+    const isStartDisabled = selectedCategories.length === 0 || phrasesInSelection === 0;
+
+    return (
+      <div className="flex flex-col items-center justify-center p-8 bg-white rounded-3xl shadow-2xl border-t-8 border-indigo-500 w-full">
+        <h1 className="text-5xl md:text-7xl font-black text-indigo-700 mb-2 tracking-tight">
+          Hola Spanish!
+        </h1>
+        <p className="text-xl md:text-2xl font-light text-gray-500 mb-6 text-center">
+          Your essential Spanish phrasebook.
+        </p>
+        
+        {reviewList.length > 0 && (
+            <div className="w-full p-4 mb-4 bg-orange-100 border-l-4 border-orange-400 rounded-lg shadow-inner">
+                <p className="font-semibold text-orange-800">
+                    <Repeat2 className="inline w-4 h-4 mr-2" />
+                    You have **{reviewList.length} phrases** pending review!
+                </p>
+                <p className="text-sm text-orange-700 mt-1">
+                    Finish your current review list before starting a new selection.
+                </p>
+            </div>
+        )}
+
+        
+        {/* Category Selection */}
+        <div className="w-full mt-4">
+            <h3 className="text-lg font-semibold text-gray-700 mb-3 border-b pb-2">
+                Select Categories ({phrasesInSelection} phrases available)
+            </h3>
+            {ALL_CATEGORIES.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
+                    {ALL_CATEGORIES.map(category => (
+                        <button
+                            key={category}
+                            onClick={() => toggleCategory(category)}
+                            className={`
+                                p-3 text-sm font-medium rounded-xl transition-colors duration-200 border-2
+                                text-center
+                                ${selectedCategories.includes(category)
+                                    ? 'bg-indigo-500 text-white border-indigo-600 shadow-md'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                                }
+                                ${(selectedCategories.includes(category) && selectedCategories.length === 1) ? 'opacity-80' : ''}
+                            `}
+                            // Disabled only if this is the last selected category
+                            disabled={selectedCategories.includes(category) && selectedCategories.length === 1}
+                        >
+                            {category}
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <div className="p-4 bg-yellow-100 text-yellow-800 rounded-lg mb-6">
+                    No phrases found.
+                </div>
+            )}
+            
+            <ActionButton 
+                onClick={selectRandomPhrases} 
+                icon={Play} 
+                color="bg-green-500 hover:bg-green-600"
+                disabled={isStartDisabled || reviewList.length > 0} // Disable if review list exists
+            >
+                Start Session ({phrasesToStart} Phrases)
+            </ActionButton>
+            {isStartDisabled && phrasesInSelection === 0 && (
+                <p className="text-red-500 text-sm mt-2 text-center font-medium">No phrases available in the selected categories.</p>
+            )}
+            {reviewList.length > 0 && (
+                 <ActionButton 
+                    onClick={startReviewSession} 
+                    icon={Repeat2} 
+                    color="bg-orange-500 hover:bg-orange-600"
+                    className="mt-4"
+                >
+                    Start Review Session ({reviewList.length} Phrases)
+                </ActionButton>
+            )}
+        </div>
+      </div>
+    );
+  };
 
   const LearningView = () => (
     <div className="flex flex-col p-6 md:p-10 bg-white rounded-3xl shadow-2xl w-full border border-gray-100">
@@ -339,7 +502,7 @@ const App = () => {
              
              {/* Hint Button */}
              <div className="flex justify-center mt-2">
-                 {!showAnswer && hintLevel < 2 && <HintButton />}
+                 {!showAnswer && currentPhrase.phonetic && hintLevel < 2 && <HintButton />}
              </div>
           </div>
         ) : (
@@ -351,7 +514,7 @@ const App = () => {
             </p>
             <div className="flex justify-between items-end text-sm border-t border-indigo-400 pt-3">
                 <span className="italic font-light">
-                  Phonetic: {currentPhrase.phonetic}
+                  Phonetic: {currentPhrase.phonetic || 'N/A'}
                 </span>
                 <span className="font-medium text-xs bg-indigo-700 py-1 px-3 rounded-full">
                   {currentPhrase.category}
@@ -364,7 +527,6 @@ const App = () => {
       {/* Action Buttons */}
       <div className="mt-8 space-y-4">
         {!showAnswer ? (
-          // Fixed the error by removing the redundant className prop, which is already handled internally.
           <ActionButton onClick={() => setShowAnswer(true)} color="bg-indigo-600 hover:bg-indigo-700">
             Reveal Answer
           </ActionButton>
@@ -409,11 +571,32 @@ const App = () => {
     <div className="flex flex-col items-center justify-center p-10 bg-white rounded-3xl shadow-2xl text-center border-t-8 border-green-500 w-full">
         <CheckCircle className="h-20 w-20 text-green-500 mb-4 animate-bounce" />
         <h1 className="text-4xl md:text-5xl font-black text-green-700 mb-2">¡Felicidades!</h1>
-        <p className="text-xl text-gray-700 mb-8">
+        <p className="text-xl text-gray-700 mb-4">
             You finished the session and knew <span className="font-bold text-gray-900">{knownCount}</span> out of <span className="font-bold text-gray-900">{selectedPhrases.length}</span> phrases!
         </p>
+        
+        {reviewList.length > 0 ? (
+            <div className="w-full mb-6 p-4 bg-orange-50 border-2 border-orange-300 rounded-lg">
+                <p className="text-lg font-semibold text-orange-800">
+                    You flagged **{reviewList.length} phrases** for review.
+                </p>
+                <ActionButton 
+                    onClick={startReviewSession} 
+                    color="bg-orange-600 hover:bg-orange-700" 
+                    icon={Repeat2}
+                    className="mt-3"
+                >
+                    Start Review Session ({reviewList.length} Phrases)
+                </ActionButton>
+            </div>
+        ) : (
+            <p className="text-lg text-gray-600 mb-6">
+                Excellent! You knew every phrase in this set.
+            </p>
+        )}
+
         <ActionButton onClick={handleRestart} color="bg-indigo-600 hover:bg-indigo-700" icon={Home}>
-          Start New Session
+          Return to Home
         </ActionButton>
     </div>
   );
@@ -429,7 +612,6 @@ const App = () => {
               return <LearningView />;
             case 'finished':
               return <FinishedView />;
-            case 'home':
             default:
               return <HomeView />;
           }
